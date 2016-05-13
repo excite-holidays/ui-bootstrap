@@ -162,7 +162,6 @@ describe('buttons', function() {
   });
 
   describe('radio', function() {
-
     var compileButtons = function(markup, scope) {
       var el = $compile('<div>'+markup+'</div>')(scope);
       scope.$digest();
@@ -323,49 +322,45 @@ describe('buttons', function() {
         expect(btns.eq(1)).not.toHaveClass('active');
       });
     });
-  });
-});
 
-/* Deprecation tests below */
+    describe('uibUncheckable', function() {
+      it('should set uncheckable', function() {
+        $scope.uncheckable = false;
+        var btns = compileButtons('<button ng-model="model" uib-btn-radio="1">click1</button><button ng-model="model" uib-btn-radio="2" uib-uncheckable="uncheckable">click2</button>', $scope);
+        expect(btns.eq(0).attr('uncheckable')).toBeUndefined();
+        expect(btns.eq(1).attr('uncheckable')).toBeUndefined();
 
-describe('buttons deprecation', function() {
-  beforeEach(module('ui.bootstrap.buttons'));
+        expect($scope.model).toBeUndefined();
 
-  it('should suppress warning', function() {
-    module(function($provide) {
-      $provide.value('$buttonsSuppressWarning', true);
+        btns.eq(0).click();
+        expect($scope.model).toEqual(1);
+
+        btns.eq(0).click();
+        expect($scope.model).toEqual(1);
+
+        btns.eq(1).click();
+        expect($scope.model).toEqual(2);
+
+        btns.eq(1).click();
+        expect($scope.model).toEqual(2);
+
+        $scope.uncheckable = true;
+        $scope.$digest();
+        expect(btns.eq(0).attr('uncheckable')).toBeUndefined();
+        expect(btns.eq(1).attr('uncheckable')).toBeDefined();
+
+        btns.eq(0).click();
+        expect($scope.model).toEqual(1);
+
+        btns.eq(0).click();
+        expect($scope.model).toEqual(1);
+
+        btns.eq(1).click();
+        expect($scope.model).toEqual(2);
+
+        btns.eq(1).click();
+        expect($scope.model).toBeNull();
+      });
     });
-
-    inject(function($compile, $log, $rootScope) {
-      spyOn($log, 'warn');
-
-      var element = $compile('<button ng-model="model" btn-checkbox>click</button>')($rootScope);
-      $rootScope.$digest();
-
-      expect($log.warn.calls.count()).toBe(0);
-
-      element = $compile('<button ng-model="model" btn-radio="1">click1</button><button ng-model="model" btn-radio="2">click2</button>')($rootScope);
-      $rootScope.$digest();
-
-      expect($log.warn.calls.count()).toBe(0);
-    });
   });
-
-  it('should give warning by default', inject(function($compile, $log, $rootScope) {
-    spyOn($log, 'warn');
-
-    var element = $compile('<button ng-model="model" btn-checkbox>click</button>')($rootScope);
-    $rootScope.$digest();
-
-    element = $compile('<button ng-model="model" btn-radio="1">click1</button><button ng-model="model" btn-radio="2">click2</button>')($rootScope);
-    $rootScope.$digest();
-
-    expect($log.warn.calls.count()).toBe(6);
-    expect($log.warn.calls.argsFor(0)).toEqual(['ButtonsController is now deprecated. Use UibButtonsController instead.']);
-    expect($log.warn.calls.argsFor(1)).toEqual(['btn-checkbox is now deprecated. Use uib-btn-checkbox instead.']);
-    expect($log.warn.calls.argsFor(2)).toEqual(['ButtonsController is now deprecated. Use UibButtonsController instead.']);
-    expect($log.warn.calls.argsFor(3)).toEqual(['btn-radio is now deprecated. Use uib-btn-radio instead.']);
-    expect($log.warn.calls.argsFor(4)).toEqual(['ButtonsController is now deprecated. Use UibButtonsController instead.']);
-    expect($log.warn.calls.argsFor(5)).toEqual(['btn-radio is now deprecated. Use uib-btn-radio instead.']);
-  }));
 });

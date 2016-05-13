@@ -1,7 +1,7 @@
 describe('pager directive', function() {
   var $compile, $rootScope, $document, $templateCache, body, element;
-  beforeEach(module('ui.bootstrap.pagination'));
-  beforeEach(module('template/pagination/pager.html'));
+  beforeEach(module('ui.bootstrap.pager'));
+  beforeEach(module('uib/template/pager/pager.html'));
   beforeEach(inject(function(_$compile_, _$rootScope_, _$document_, _$templateCache_) {
     $compile = _$compile_;
     $rootScope = _$rootScope_;
@@ -54,7 +54,7 @@ describe('pager directive', function() {
   });
 
   it('exposes the controller on the template', function() {
-    $templateCache.put('template/pagination/pager.html', '<div>{{pagination.text}}</div>');
+    $templateCache.put('uib/template/pager/pager.html', '<div>{{pager.text}}</div>');
 
     element = $compile('<uib-pager></uib-pager>')($rootScope);
     $rootScope.$digest();
@@ -147,7 +147,7 @@ describe('pager directive', function() {
   it('allows custom templates', function() {
     $templateCache.put('foo/bar.html', '<div>baz</div>');
 
-    element = $compile('<pager template-url="foo/bar.html"></pager>')($rootScope);
+    element = $compile('<uib-pager template-url="foo/bar.html"></uib-pager>')($rootScope);
     $rootScope.$digest();
 
     expect(element.html()).toBe('baz');
@@ -278,34 +278,4 @@ describe('pager directive', function() {
     expect(getPaginationEl(0)).toHaveClass('disabled');
     expect(getPaginationEl(-1)).toHaveClass('disabled');
   });
-});
-
-describe('pager deprecation', function() {
-  beforeEach(module('ui.bootstrap.pagination'));
-  beforeEach(module('template/pagination/pager.html'));
-
-  it('should suppress warning', function() {
-    module(function($provide) {
-      $provide.value('$paginationSuppressWarning', true);
-    });
-
-    inject(function($compile, $log, $rootScope) {
-      spyOn($log, 'warn');
-      
-      var element = $compile('<pager total-items="total" ng-model="currentPage"></pager>')($rootScope);
-      $rootScope.$digest();
-      expect($log.warn.calls.count()).toBe(0);
-    });
-  });
-
-  it('should give warning by default', inject(function($compile, $log, $rootScope) {
-    spyOn($log, 'warn');
-
-    var element = $compile('<pager total-items="total" ng-model="currentPage"></pager>')($rootScope);
-    $rootScope.$digest();
-
-    expect($log.warn.calls.count()).toBe(2);
-    expect($log.warn.calls.argsFor(0)).toEqual(['PaginationController is now deprecated. Use UibPaginationController instead.']);
-    expect($log.warn.calls.argsFor(1)).toEqual(['pager is now deprecated. Use uib-pager instead.']);
-  }));
 });

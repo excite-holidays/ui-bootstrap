@@ -3,8 +3,8 @@ describe('uib-accordion', function() {
 
   beforeEach(module('ui.bootstrap.accordion'));
   beforeEach(module('ngAnimateMock'));
-  beforeEach(module('template/accordion/accordion.html'));
-  beforeEach(module('template/accordion/accordion-group.html'));
+  beforeEach(module('uib/template/accordion/accordion.html'));
+  beforeEach(module('uib/template/accordion/accordion-group.html'));
 
   beforeEach(inject(function(_$animate_, $rootScope) {
     $animate = _$animate_;
@@ -36,6 +36,7 @@ describe('uib-accordion', function() {
         ctrl.addGroup(group2 = { isOpen: true, $on : angular.noop });
         ctrl.addGroup(group3 = { isOpen: true, $on : angular.noop });
       });
+
       it('should close other panels if close-others attribute is not defined', function() {
         delete $attrs.closeOthers;
         ctrl.closeOthers(group2);
@@ -66,6 +67,7 @@ describe('uib-accordion', function() {
           originalCloseOthers = uibAccordionConfig.closeOthers;
           uibAccordionConfig.closeOthers = false;
         }));
+
         afterEach(inject(function(uibAccordionConfig) {
           // return it to the original value
           uibAccordionConfig.closeOthers = originalCloseOthers;
@@ -121,8 +123,14 @@ describe('uib-accordion', function() {
       $templateCache = _$templateCache_;
     }));
 
+    it('should be a tablist', function() {
+      element = $compile('<uib-accordion></uib-accordion>')(scope);
+      scope.$digest();
+      expect(element.html()).toContain('role="tablist"');
+    });
+
     it('should expose the controller on the view', function() {
-      $templateCache.put('template/accordion/accordion.html', '<div>{{accordion.text}}</div>');
+      $templateCache.put('uib/template/accordion/accordion.html', '<div>{{accordion.text}}</div>');
 
       element = $compile('<uib-accordion></uib-accordion>')(scope);
       scope.$digest();
@@ -139,18 +147,20 @@ describe('uib-accordion', function() {
     it('should allow custom templates', function() {
       $templateCache.put('foo/bar.html', '<div>baz</div>');
 
-      element = $compile('<accordion template-url="foo/bar.html"></accordion>')(scope);
+      element = $compile('<uib-accordion template-url="foo/bar.html"></uib-accordion>')(scope);
       scope.$digest();
       expect(element.html()).toBe('<div>baz</div>');
     });
   });
 
   describe('uib-accordion-group', function() {
-
     var scope, $compile;
     var element, groups;
+    var findGroupHeading = function(index) {
+      return groups.eq(index).find('.panel-heading').eq(0);
+    };
     var findGroupLink = function(index) {
-      return groups.eq(index).find('a').eq(0);
+      return groups.eq(index).find('.accordion-toggle').eq(0);
     };
     var findGroupBody = function(index) {
       return groups.eq(index).find('.panel-collapse').eq(0);
@@ -176,16 +186,18 @@ describe('uib-accordion', function() {
 
     describe('with static panels', function() {
       beforeEach(function() {
+        spyOn(Math, 'random').and.returnValue(0.1);
         var tpl =
-              '<uib-accordion>' +
-                '<uib-accordion-group heading="title 1">Content 1</uib-accordion-group>' +
-                '<uib-accordion-group heading="title 2">Content 2</uib-accordion-group>' +
-              '</uib-accordion>';
+          '<uib-accordion>' +
+            '<uib-accordion-group heading="title 1">Content 1</uib-accordion-group>' +
+            '<uib-accordion-group heading="title 2">Content 2</uib-accordion-group>' +
+          '</uib-accordion>';
         element = angular.element(tpl);
         $compile(element)(scope);
         scope.$digest();
         groups = element.find('.panel');
       });
+
       afterEach(function() {
         element.remove();
       });
@@ -202,20 +214,26 @@ describe('uib-accordion', function() {
         findGroupLink(0).click();
         scope.$digest();
         expect(findGroupBody(0).scope().isOpen).toBe(true);
+        expect(findGroupHeading(0).html()).toContain('aria-expanded="true"');
 
         findGroupLink(1).click();
         scope.$digest();
         expect(findGroupBody(0).scope().isOpen).toBe(false);
+        expect(findGroupHeading(0).html()).toContain('aria-expanded="false"');
         expect(findGroupBody(1).scope().isOpen).toBe(true);
+        expect(findGroupHeading(1).html()).toContain('aria-expanded="true"');
       });
 
       it('should toggle element on click', function() {
         findGroupLink(0).click();
         scope.$digest();
         expect(findGroupBody(0).scope().isOpen).toBe(true);
+        expect(groups.eq(0).html()).toContain('aria-hidden="false"');
+
         findGroupLink(0).click();
         scope.$digest();
         expect(findGroupBody(0).scope().isOpen).toBe(false);
+        expect(groups.eq(0).html()).toContain('aria-hidden="true"');
       });
 
       it('should add, by default, "panel-open" when opened', function() {
@@ -254,20 +272,31 @@ describe('uib-accordion', function() {
 
         expect(group).not.toHaveClass('panel-open');
       });
+
+      it('should generate an Id for the heading', function() {
+        var groupScope = findGroupBody(0).scope();
+        expect(groupScope.headingId).toEqual('accordiongroup-' + groupScope.$id + '-1000-tab');
+      });
+
+      it('should generate an Id for the panel', function() {
+        var groupScope = findGroupBody(0).scope();
+        expect(groupScope.panelId).toEqual('accordiongroup-' + groupScope.$id + '-1000-panel');
+      });
     });
 
     describe('with open-class attribute', function() {
       beforeEach(function() {
         var tpl =
-              '<uib-accordion>' +
-                '<uib-accordion-group heading="title 1" open-class="custom-open-class">Content 1</uib-accordion-group>' +
-                '<uib-accordion-group heading="title 2" open-class="custom-open-class">Content 2</uib-accordion-group>' +
-              '</uib-accordion>';
+          '<uib-accordion>' +
+            '<uib-accordion-group heading="title 1" open-class="custom-open-class">Content 1</uib-accordion-group>' +
+            '<uib-accordion-group heading="title 2" open-class="custom-open-class">Content 2</uib-accordion-group>' +
+          '</uib-accordion>';
         element = angular.element(tpl);
         $compile(element)(scope);
         scope.$digest();
         groups = element.find('.panel');
       });
+
       afterEach(function() {
         element.remove();
       });
@@ -363,10 +392,10 @@ describe('uib-accordion', function() {
     describe('is-open attribute with dynamic content', function() {
       beforeEach(function() {
         var tpl =
-              '<uib-accordion>' +
-                '<uib-accordion-group heading="title 1" is-open="open1"><div ng-repeat="item in items">{{item}}</div></uib-accordion-group>' +
-                '<uib-accordion-group heading="title 2" is-open="open2">Static content</uib-accordion-group>' +
-              '</uib-accordion>';
+          '<uib-accordion>' +
+            '<uib-accordion-group heading="title 1" is-open="open1"><div ng-repeat="item in items">{{item}}</div></uib-accordion-group>' +
+            '<uib-accordion-group heading="title 2" is-open="open2">Static content</uib-accordion-group>' +
+          '</uib-accordion>';
         element = angular.element(tpl);
         scope.items = ['Item 1', 'Item 2', 'Item 3'];
         scope.open1 = true;
@@ -423,13 +452,36 @@ describe('uib-accordion', function() {
       });
     });
 
+    describe('is-open attribute with custom class', function() {
+      beforeEach(function() {
+        var tpl =
+          '<uib-accordion>' +
+            '<uib-accordion-group ng-repeat="group in groups" heading="{{group.name}}" is-open="group.open" class="testClass">{{group.content}}</uib-accordion-group>' +
+          '</uib-accordion>';
+        element = angular.element(tpl);
+        scope.groups = [
+          {name: 'title 1', content: 'Content 1', open: false},
+          {name: 'title 2', content: 'Content 2', open: true}
+        ];
+        $compile(element)(scope);
+        scope.$digest();
+
+        groups = element.find('.panel');
+      });
+
+      it('should add "panel-open" class', function(){
+        expect(groups.eq(0)).not.toHaveClass('panel-open');
+        expect(groups.eq(1)).toHaveClass('panel-open');
+      });
+    });
+
     describe('`is-disabled` attribute', function() {
       var groupBody;
       beforeEach(function() {
         var tpl =
-              '<uib-accordion>' +
-                '<uib-accordion-group heading="title 1" is-disabled="disabled">Content 1</uib-accordion-group>' +
-              '</uib-accordion>';
+          '<uib-accordion>' +
+            '<uib-accordion-group heading="title 1" is-disabled="disabled">Content 1</uib-accordion-group>' +
+          '</uib-accordion>';
         element = angular.element(tpl);
         scope.disabled = true;
         $compile(element)(scope);
@@ -465,19 +517,19 @@ describe('uib-accordion', function() {
 
     // This is re-used in both the uib-accordion-heading element and the uib-accordion-heading attribute tests
     function isDisabledStyleCheck() {
-        var tpl =
-          '<uib-accordion ng-init="a = [1,2,3]">' +
-            '<uib-accordion-group heading="I get overridden" is-disabled="true">' +
-              '<uib-accordion-heading>Heading Element <span ng-repeat="x in a">{{x}}</span> </uib-accordion-heading>' +
-              'Body' +
-            '</uib-accordion-group>' +
-          '</uib-accordion>';
-        scope.disabled = true;
-        element = $compile(tpl)(scope);
-        scope.$digest();
-        groups = element.find('.panel');
+      var tpl =
+        '<uib-accordion ng-init="a = [1,2,3]">' +
+          '<uib-accordion-group heading="I get overridden" is-disabled="true">' +
+            '<uib-accordion-heading>Heading Element <span ng-repeat="x in a">{{x}}</span> </uib-accordion-heading>' +
+            'Body' +
+          '</uib-accordion-group>' +
+        '</uib-accordion>';
+      scope.disabled = true;
+      element = $compile(tpl)(scope);
+      scope.$digest();
+      groups = element.find('.panel');
 
-        expect(findGroupLink(0).find('span').hasClass('text-muted')).toBe(true);
+      expect(findGroupLink(0).find('span').hasClass('text-muted')).toBe(true);
     }
 
     describe('uib-accordion-heading element', function() {
@@ -507,7 +559,6 @@ describe('uib-accordion', function() {
       });
 
       it('should have disabled styling when is-disabled is true', isDisabledStyleCheck);
-
     });
 
     describe('uib-accordion-heading attribute', function() {
@@ -533,7 +584,6 @@ describe('uib-accordion', function() {
       });
 
       it('should have disabled styling when is-disabled is true', isDisabledStyleCheck);
-
     });
 
     describe('uib-accordion-heading, with repeating uib-accordion-groups', function() {
@@ -560,8 +610,8 @@ describe('uib-accordion', function() {
       });
     });
 
-    describe('uib-accordion group panel class - #3968', function() {
-      it('should use the default value when panel class is falsy', function() {
+    describe('uib-accordion group panel class', function() {
+      it('should use the default value when panel class is falsy - #3968', function() {
         element = $compile('<uib-accordion><uib-accordion-group heading="Heading">Content</uib-accordion-group></uib-accordion>')(scope);
         scope.$digest();
         groups = element.find('.panel');
@@ -573,63 +623,26 @@ describe('uib-accordion', function() {
         expect(groups.eq(0)).toHaveClass('panel-default');
       });
 
-      it('should use the specified value when not falsy', function() {
+      it('should use the specified value when not falsy - #3968', function() {
         element = $compile('<uib-accordion><uib-accordion-group heading="Heading" panel-class="custom-class">Content</uib-accordion-group></uib-accordion>')(scope);
         scope.$digest();
         groups = element.find('.panel');
         expect(groups.eq(0)).toHaveClass('custom-class');
         expect(groups.eq(0)).not.toHaveClass('panel-default');
       });
+      
+      it('should change class if panel-class is changed', function() {
+        element = $compile('<uib-accordion><uib-accordion-group heading="Heading" panel-class="{{panelClass}}">Content</uib-accordion-group></uib-accordion>')(scope);
+        scope.panelClass = 'custom-class';
+        scope.$digest();
+        groups = element.find('.panel');
+        expect(groups.eq(0)).toHaveClass('custom-class');
+        
+        scope.panelClass = 'different-class';
+        scope.$digest();
+        expect(groups.eq(0)).toHaveClass('different-class');
+        expect(groups.eq(0)).not.toHaveClass('custom-class');
+      });
     });
   });
-});
-
-/* Deprecation tests below */
-
-describe('accordion deprecation', function() {
-  beforeEach(module('ui.bootstrap.accordion'));
-  beforeEach(module('ngAnimateMock'));
-  beforeEach(module('template/accordion/accordion.html'));
-  beforeEach(module('template/accordion/accordion-group.html'));
-
-  it('should suppress warning', function() {
-    module(function($provide) {
-      $provide.value('$accordionSuppressWarning', true);
-    });
-
-    inject(function($compile, $log, $rootScope) {
-      spyOn($log, 'warn');
-
-      var element =
-        '<accordion ng-init="a = [1,2,3]">' +
-          '<accordion-group heading="I get overridden">' +
-            '<div accordion-heading>Heading Element <span ng-repeat="x in a">{{x}}</span> </div>' +
-            'Body' +
-          '</accordion-group>' +
-        '</accordion>';
-      element = $compile(element)($rootScope);
-      $rootScope.$digest();
-      expect($log.warn.calls.count()).toBe(0);
-    });
-  });
-
-  it('should give warning by default', inject(function($compile, $log, $rootScope) {
-    spyOn($log, 'warn');
-
-    var element =
-      '<accordion ng-init="a = [1,2,3]">' +
-        '<accordion-group heading="I get overridden">' +
-          '<div accordion-heading>Heading Element <span ng-repeat="x in a">{{x}}</span> </div>' +
-          'Body' +
-        '</accordion-group>' +
-      '</accordion>';
-    element = $compile(element)($rootScope);
-    $rootScope.$digest();
-
-    expect($log.warn.calls.count()).toBe(4);
-    expect($log.warn.calls.argsFor(0)).toEqual(['AccordionController is now deprecated. Use UibAccordionController instead.']);
-    expect($log.warn.calls.argsFor(1)).toEqual(['accordion-heading is now deprecated. Use uib-accordion-heading instead.']);
-    expect($log.warn.calls.argsFor(2)).toEqual(['accordion-group is now deprecated. Use uib-accordion-group instead.']);
-    expect($log.warn.calls.argsFor(3)).toEqual(['accordion is now deprecated. Use uib-accordion instead.']);
-  }));
 });

@@ -2,7 +2,7 @@ describe('uib-alert', function() {
   var element, scope, $compile, $templateCache, $timeout;
 
   beforeEach(module('ui.bootstrap.alert'));
-  beforeEach(module('template/alert/alert.html'));
+  beforeEach(module('uib/template/alert/alert.html'));
 
   beforeEach(inject(function($rootScope, _$compile_, _$templateCache_, _$timeout_) {
     scope = $rootScope;
@@ -39,7 +39,7 @@ describe('uib-alert', function() {
   }
 
   it('should expose the controller to the view', function() {
-    $templateCache.put('template/alert/alert.html', '<div>{{alert.text}}</div>');
+    $templateCache.put('uib/template/alert/alert.html', '<div>{{alert.text}}</div>');
 
     element = $compile('<uib-alert></uib-alert>')(scope);
     scope.$digest();
@@ -149,38 +149,4 @@ describe('uib-alert', function() {
     $timeout.flush(500);
     expect(scope.removeAlert).toHaveBeenCalled();
   });
-});
-
-/* Deprecation tests below */
-
-describe('alert deprecation', function() {
-  beforeEach(module('ui.bootstrap.alert'));
-  beforeEach(module('template/alert/alert.html'));
-
-  it('should suppress warning', function() {
-    module(function($provide) {
-      $provide.value('$alertSuppressWarning', true);
-    });
-
-    inject(function($compile, $log, $rootScope) {
-      spyOn($log, 'warn');
-
-      var element = '<alert></alert>';
-      element = $compile(element)($rootScope);
-      $rootScope.$digest();
-      expect($log.warn.calls.count()).toBe(0);
-    });
-  });
-
-  it('should give warning by default', inject(function($compile, $log, $rootScope) {
-    spyOn($log, 'warn');
-
-    var element = '<alert></alert>';
-    element = $compile(element)($rootScope);
-    $rootScope.$digest();
-
-    expect($log.warn.calls.count()).toBe(2);
-    expect($log.warn.calls.argsFor(0)).toEqual(['AlertController is now deprecated. Use UibAlertController instead.']);
-    expect($log.warn.calls.argsFor(1)).toEqual(['alert is now deprecated. Use uib-alert instead.']);
-  }));
 });

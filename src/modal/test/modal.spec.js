@@ -1,14 +1,82 @@
-describe('$uibModal', function () {
+describe('$uibResolve', function() {
+  beforeEach(module('ui.bootstrap.modal'));
+
+  it('should resolve invocables and return promise with object of resolutions', function() {
+    module(function($provide) {
+      $provide.factory('bar', function() {
+        return 'bar';
+      });
+    });
+
+    inject(function($q, $rootScope, $uibResolve) {
+      $uibResolve.resolve({
+        foo: 'bar',
+        bar: $q.resolve('baz'),
+        baz: function() {
+          return 'boo';
+        }
+      }).then(function(resolves) {
+          expect(resolves).toEqual({
+            foo: 'bar',
+            bar: 'baz',
+            baz: 'boo'
+          });
+        });
+
+      $rootScope.$digest();
+    });
+  });
+
+  describe('with custom resolver', function() {
+    beforeEach(module(function($provide, $uibResolveProvider) {
+      $provide.factory('$resolve', function() {
+        return {
+          resolve: jasmine.createSpy()
+        };
+      });
+
+      $uibResolveProvider.setResolver('$resolve');
+    }));
+
+    it('should call $resolve.resolve', inject(function($uibResolve, $resolve) {
+      $uibResolve.resolve({foo: 'bar'}, {}, null, null);
+
+      expect($resolve.resolve).toHaveBeenCalledWith({foo: 'bar'}, {}, null, null);
+    }));
+  });
+});
+
+describe('$uibModal', function() {
   var $animate, $controllerProvider, $rootScope, $document, $compile, $templateCache, $timeout, $q;
   var $uibModal, $uibModalStack, $uibModalProvider;
 
   beforeEach(module('ngAnimateMock'));
   beforeEach(module('ui.bootstrap.modal'));
-  beforeEach(module('template/modal/backdrop.html'));
-  beforeEach(module('template/modal/window.html'));
-  beforeEach(module(function(_$controllerProvider_, _$uibModalProvider_){
+  beforeEach(module('uib/template/modal/backdrop.html'));
+  beforeEach(module('uib/template/modal/window.html'));
+  beforeEach(module(function(_$controllerProvider_, _$uibModalProvider_, $compileProvider) {
     $controllerProvider = _$controllerProvider_;
     $uibModalProvider = _$uibModalProvider_;
+    $compileProvider.directive('parentDirective', function() {
+      return {
+        controller: function() {
+          this.text = 'foo';
+        }
+      };
+    }).directive('childDirective', function() {
+      return {
+        require: '^parentDirective',
+        link: function(scope, elem, attrs, ctrl) {
+          scope.text = ctrl.text;
+        }
+      };
+    }).directive('focusMe', function() {
+      return {
+        link: function(scope, elem, attrs) {
+          elem.focus();
+        }
+      };
+    });
   }));
 
   beforeEach(inject(function(_$animate_, _$rootScope_, _$document_, _$compile_, _$templateCache_, _$timeout_, _$q_, _$uibModal_, _$uibModalStack_) {
@@ -134,6 +202,7 @@ describe('$uibModal', function () {
     body.find('div.modal').remove();
     body.find('div.modal-backdrop').remove();
     body.removeClass('modal-open');
+    $document.off('keydown');
   });
 
   function triggerKeyDown(element, keyCode, shiftKey) {
@@ -144,10 +213,16 @@ describe('$uibModal', function () {
     element.trigger(e);
   }
 
-  function open(modalOptions) {
+  function open(modalOptions, noFlush, noDigest) {
     var modal = $uibModal.open(modalOptions);
-    $rootScope.$digest();
-    $timeout.flush(0);
+
+    if (!noDigest) {
+      $rootScope.$digest();
+      if (!noFlush) {
+        $animate.flush();
+      }
+    }
+
     return modal;
   }
 
@@ -188,6 +263,82 @@ describe('$uibModal', function () {
       expect($document).toHaveModalsOpen(0);
 
       expect($document).not.toHaveBackdrop();
+    });
+
+    it('should compile modal before inserting into DOM', function() {
+      var topModal;
+      var modalInstance = {
+        result: $q.defer(),
+        opened: $q.defer(),
+        closed: $q.defer(),
+        rendered: $q.defer(),
+        close: function (result) {
+          return $uibModalStack.close(modalInstance, result);
+        },
+        dismiss: function (reason) {
+          return $uibModalStack.dismiss(modalInstance, reason);
+        }
+      };
+      var expectedText = 'test';
+
+      $uibModalStack.open(modalInstance, {
+        appendTo: angular.element(document.body),
+        scope: $rootScope.$new(),
+        deferred: modalInstance.result,
+        renderDeferred: modalInstance.rendered,
+        closedDeferred: modalInstance.closed,
+        content: '<div id="test">{{\'' + expectedText + '\'}}</div>'
+      });
+
+      topModal = $uibModalStack.getTop();
+
+      expect(topModal.value.modalDomEl.find('#test').length).toEqual(0);
+      expect(angular.element('#test').length).toEqual(0);
+
+      $rootScope.$digest();
+
+      expect(topModal.value.modalDomEl.find('#test').text()).toEqual(expectedText);
+      expect(angular.element('#test').text()).toEqual(expectedText);
+
+      $animate.flush();
+
+      close(modalInstance, 'closing in test', true);
+    });
+
+    it('should resolve rendered promise when animation is complete', function() {
+      var modalInstance = {
+        result: $q.defer(),
+        opened: $q.defer(),
+        closed: $q.defer(),
+        rendered: $q.defer(),
+        close: function (result) {
+          return $uibModalStack.close(modalInstance, result);
+        },
+        dismiss: function (reason) {
+          return $uibModalStack.dismiss(modalInstance, reason);
+        }
+      };
+      var rendered = false;
+      modalInstance.rendered.promise.then(function() {
+        rendered = true;
+      });
+
+      $uibModalStack.open(modalInstance, {
+        appendTo: angular.element(document.body),
+        scope: $rootScope.$new(),
+        deferred: modalInstance.result,
+        renderDeferred: modalInstance.rendered,
+        closedDeferred: modalInstance.closed,
+        content: '<div id="test">test</div>'
+      });
+
+      $rootScope.$digest();
+
+      expect(rendered).toBe(false);
+
+      $animate.flush();
+
+      expect(rendered).toBe(true);
     });
 
     it('should not throw an exception on a second dismiss', function() {
@@ -293,7 +444,6 @@ describe('$uibModal', function () {
       expect(document.activeElement.tagName).toBe('A');
 
       var modal = open({template: '<div>Content<button>inside modal</button></div>'});
-      $animate.flush();
       $rootScope.$digest();
       expect(document.activeElement.tagName).toBe('DIV');
       expect($document).toHaveModalsOpen(1);
@@ -318,7 +468,6 @@ describe('$uibModal', function () {
       expect(document.activeElement.tagName).toBe('A');
 
       var modal = open({template: '<div>Content</div>'});
-      $animate.flush();
       $rootScope.$digest();
       expect(document.activeElement.tagName).toBe('DIV');
       expect($document).toHaveModalsOpen(1);
@@ -345,7 +494,6 @@ describe('$uibModal', function () {
     });
 
     it('should reject returned promise on dismiss', function() {
-
       var modal = open({template: '<div>Content</div>'});
       dismiss(modal, 'esc');
 
@@ -366,6 +514,34 @@ describe('$uibModal', function () {
       expect($document).toHaveModalsOpen(0);
     });
 
+    it('should resolve the closed promise when modal is closed', function() {
+      var modal = open({template: '<div>Content</div>'});
+      var closed = false;
+      close(modal, 'closed ok');
+
+      modal.closed.then(function() {
+        closed = true;
+      });
+
+      $rootScope.$digest();
+
+      expect(closed).toBe(true);
+    });
+
+    it('should resolve the closed promise when modal is dismissed', function() {
+      var modal = open({template: '<div>Content</div>'});
+      var closed = false;
+      dismiss(modal, 'esc');
+
+      modal.closed.then(function() {
+        closed = true;
+      });
+
+      $rootScope.$digest();
+
+      expect(closed).toBe(true);
+    });
+
     it('should expose a promise linked to the templateUrl / resolve promises', function() {
       var modal = open({template: '<div>Content</div>', resolve: {
           ok: function() {return $q.when('ok');}
@@ -376,16 +552,14 @@ describe('$uibModal', function () {
 
     it('should expose a promise linked to the templateUrl / resolve promises and reject it if needed', function() {
       var modal = open({template: '<div>Content</div>', resolve: {
-          ok: function() {return $q.reject('ko');}
-        }}
-      );
+        ok: function() {return $q.reject('ko');}
+      }}, true);
       expect(modal.opened).toBeRejectedWith('ko');
     });
 
     it('should focus on the element that has autofocus attribute when the modal is open/reopen and the animations have finished', function() {
       function openAndCloseModalWithAutofocusElement() {
         var modal = open({template: '<div><input type="text" id="auto-focus-element" autofocus></div>'});
-        $animate.flush();
         $rootScope.$digest();
         expect(angular.element('#auto-focus-element')).toHaveFocus();
 
@@ -398,13 +572,30 @@ describe('$uibModal', function () {
       openAndCloseModalWithAutofocusElement();
     });
 
+    it('should not focus on the element that has autofocus attribute when the modal is opened and something in the modal already has focus and the animations have finished', function() {
+      function openAndCloseModalWithAutofocusElement() {
+
+        var modal = open({template: '<div><input type="text" id="auto-focus-element" autofocus><input type="text" id="pre-focus-element" focus-me></div>'});
+        $rootScope.$digest();
+        expect(angular.element('#auto-focus-element')).not.toHaveFocus();
+        expect(angular.element('#pre-focus-element')).toHaveFocus();
+
+        close(modal, 'closed ok');
+
+        expect(modal.result).toBeResolvedWith('closed ok');
+      }
+
+      openAndCloseModalWithAutofocusElement();
+      openAndCloseModalWithAutofocusElement();
+    });
+
     it('should wait until the in animation is finished before attempting to focus the modal or autofocus element', function() {
       function openAndCloseModalWithAutofocusElement() {
-        var modal = open({template: '<div><input type="text" id="auto-focus-element" autofocus></div>'});
+        var modal = open({template: '<div><input type="text" id="auto-focus-element" autofocus></div>'}, true, true);
         expect(angular.element('#auto-focus-element')).not.toHaveFocus();
 
-        $animate.flush();
         $rootScope.$digest();
+        $animate.flush();
 
         expect(angular.element('#auto-focus-element')).toHaveFocus();
 
@@ -420,17 +611,19 @@ describe('$uibModal', function () {
         element.focus();
         expect(document.activeElement.tagName).toBe('A');
 
-        var modal = open({template: '<div><input type="text"></div>'});
+        var modal = open({template: '<div><input type="text"></div>'}, true, true);
         expect(document.activeElement.tagName).toBe('A');
 
-        $animate.flush();
         $rootScope.$digest();
+        $animate.flush();
 
         expect(document.activeElement.tagName).toBe('DIV');
 
         close(modal, 'closed ok');
 
         expect(modal.result).toBeResolvedWith('closed ok');
+
+        element.remove();
       }
 
       openAndCloseModalWithAutofocusElement();
@@ -465,12 +658,152 @@ describe('$uibModal', function () {
         template:'<a href="#" id="tab-focus-link"><input type="text" id="tab-focus-input1"/><input type="text" id="tab-focus-input2"/>' +
         '<button id="tab-focus-button">Open me!</button>'
       });
+      $rootScope.$digest();
       expect($document).toHaveModalsOpen(1);
+
+      triggerKeyDown(angular.element(document.activeElement), 9, true);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-button');
 
       var lastElement = angular.element(document.getElementById('tab-focus-link'));
       lastElement.focus();
-      triggerKeyDown(lastElement, 9, true);
+      triggerKeyDown(angular.element(document.activeElement), 9, true);
       expect(document.activeElement.getAttribute('id')).toBe('tab-focus-button');
+
+      initialPage.remove();
+    });
+
+    it('should change focus to first element when tab key is pressed when keyboard is false', function() {
+      var initialPage = angular.element('<a href="#" id="cannot-get-focus-from-modal">Outland link</a>');
+      angular.element(document.body).append(initialPage);
+      initialPage.focus();
+
+      open({
+        template:'<a href="#" id="tab-focus-link"><input type="text" id="tab-focus-input1"/><input type="text" id="tab-focus-input2"/>' +
+        '<button id="tab-focus-button">Open me!</button>',
+        keyboard: false
+      });
+      expect($document).toHaveModalsOpen(1);
+
+      var lastElement = angular.element(document.getElementById('tab-focus-button'));
+      lastElement.focus();
+      triggerKeyDown(lastElement, 9);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link');
+
+      initialPage.remove();
+    });
+
+    it('should change focus to last element when shift+tab keys are pressed when keyboard is false', function() {
+      var initialPage = angular.element('<a href="#" id="cannot-get-focus-from-modal">Outland link</a>');
+      angular.element(document.body).append(initialPage);
+      initialPage.focus();
+
+      open({
+        template:'<a href="#" id="tab-focus-link"><input type="text" id="tab-focus-input1"/><input type="text" id="tab-focus-input2"/>' +
+        '<button id="tab-focus-button">Open me!</button>',
+        keyboard: false
+      });
+      $rootScope.$digest();
+      expect($document).toHaveModalsOpen(1);
+
+      triggerKeyDown(angular.element(document.activeElement), 9, true);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-button');
+
+      var lastElement = angular.element(document.getElementById('tab-focus-link'));
+      lastElement.focus();
+      triggerKeyDown(angular.element(document.activeElement), 9, true);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-button');
+
+      initialPage.remove();
+    });
+
+    it('should change focus to next proper element when DOM changes and tab is pressed', function() {
+      var initialPage = angular.element('<a href="#" id="cannot-get-focus-from-modal">Outland link</a>');
+      angular.element(document.body).append(initialPage);
+      initialPage.focus();
+
+      open({
+        template:'<a href="#" id="tab-focus-link1">a</a><a href="#" id="tab-focus-link2">b</a><a href="#" id="tab-focus-link3">c</a>' +
+        '<button id="tab-focus-button">Open me!</button>',
+        keyboard: false
+      });
+      $rootScope.$digest();
+      expect($document).toHaveModalsOpen(1);
+
+      $('#tab-focus-link3').focus();
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link3');
+
+      $('#tab-focus-button').remove();
+      triggerKeyDown(angular.element(document.activeElement), 9, false);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link1');
+
+      initialPage.remove();
+    });
+
+    it('should change focus to next proper element when DOM changes and shift+tab is pressed', function() {
+      var initialPage = angular.element('<a href="#" id="cannot-get-focus-from-modal">Outland link</a>');
+      angular.element(document.body).append(initialPage);
+      initialPage.focus();
+
+      open({
+        template:'<a href="#" id="tab-focus-link1">a</a><a href="#" id="tab-focus-link2">b</a><a href="#" id="tab-focus-link3">c</a>' +
+        '<button id="tab-focus-button">Open me!</button>',
+        keyboard: false
+      });
+      $rootScope.$digest();
+      expect($document).toHaveModalsOpen(1);
+
+      $('#tab-focus-link1').focus();
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link1');
+
+      $('#tab-focus-button').remove();
+      triggerKeyDown(angular.element(document.activeElement), 9, true);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link3');
+
+      initialPage.remove();
+    });
+
+    it('should change focus to next non-hidden element when tab is pressed', function() {
+      var initialPage = angular.element('<a href="#" id="cannot-get-focus-from-modal">Outland link</a>');
+      angular.element(document.body).append(initialPage);
+      initialPage.focus();
+
+      open({
+        template:'<a href="#" id="tab-focus-link1">a</a><a href="#" id="tab-focus-link2">b</a><a href="#" id="tab-focus-link3">c</a>' +
+        '<button id="tab-focus-button">Open me!</button>',
+        keyboard: false
+      });
+      $rootScope.$digest();
+      expect($document).toHaveModalsOpen(1);
+
+      $('#tab-focus-link3').focus();
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link3');
+
+      $('#tab-focus-button').css('display', 'none');
+      triggerKeyDown(angular.element(document.activeElement), 9, false);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link1');
+
+      initialPage.remove();
+    });
+
+    it('should change focus to previous non-hidden element when shift+tab is pressed', function() {
+      var initialPage = angular.element('<a href="#" id="cannot-get-focus-from-modal">Outland link</a>');
+      angular.element(document.body).append(initialPage);
+      initialPage.focus();
+
+      open({
+        template:'<a href="#" id="tab-focus-link1">a</a><a href="#" id="tab-focus-link2">b</a><a href="#" id="tab-focus-link3">c</a>' +
+        '<button id="tab-focus-button">Open me!</button>',
+        keyboard: false
+      });
+      $rootScope.$digest();
+      expect($document).toHaveModalsOpen(1);
+
+      $('#tab-focus-link1').focus();
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link1');
+
+      $('#tab-focus-button').css('display', 'none');
+      triggerKeyDown(angular.element(document.activeElement), 9, true);
+      expect(document.activeElement.getAttribute('id')).toBe('tab-focus-link3');
 
       initialPage.remove();
     });
@@ -569,11 +902,43 @@ describe('$uibModal', function () {
       });
 
       it('should allow usage of bindToController', function() {
-        open({template: '<div>{{test.fromCtrl}} {{test.isModalInstance}}</div>', controller: function($uibModalInstance) {
-          this.fromCtrl = 'Content from ctrl';
-          this.isModalInstance = angular.isObject($uibModalInstance) && angular.isFunction($uibModalInstance.close);
-        }, controllerAs: 'test', bindToController: true});
-        expect($document).toHaveModalOpenWithContent('Content from ctrl true', 'div');
+        var $scope = $rootScope.$new(true);
+        $scope.foo = 'bar';
+        open({
+          template: '<div>{{test.fromCtrl}} {{test.closeDismissPresent()}} {{test.foo}}</div>',
+          controller: function($uibModalInstance) {
+            expect(this.foo).toEqual($scope.foo);
+            this.fromCtrl = 'Content from ctrl';
+            this.closeDismissPresent = function() {
+              return angular.isFunction(this.$close) && angular.isFunction(this.$dismiss);
+            };
+          },
+          controllerAs: 'test',
+          bindToController: true,
+          scope: $scope
+        });
+        expect($document).toHaveModalOpenWithContent('Content from ctrl true bar', 'div');
+      });
+
+      it('should have $onInit called', function() {
+        var $scope = $rootScope.$new(true);
+        var $onInit = jasmine.createSpy('$onInit');
+        $scope.foo = 'bar';
+        open({
+          template: '<div>{{test.fromCtrl}} {{test.closeDismissPresent()}} {{test.foo}}</div>',
+          controller: function($uibModalInstance) {
+            this.$onInit = $onInit;
+            this.fromCtrl = 'Content from ctrl';
+            this.closeDismissPresent = function() {
+              return angular.isFunction(this.$close) && angular.isFunction(this.$dismiss);
+            };
+          },
+          controllerAs: 'test',
+          bindToController: true,
+          scope: $scope
+        });
+        expect($document).toHaveModalOpenWithContent('Content from ctrl true bar', 'div');
+        expect($onInit).toHaveBeenCalled();
       });
     });
 
@@ -633,7 +998,7 @@ describe('$uibModal', function () {
           value: function() {
             return $timeout(function() { return 'Promise'; }, 100);
           }
-        }));
+        }), true);
         expect($document).toHaveModalsOpen(0);
 
         $timeout.flush();
@@ -647,7 +1012,7 @@ describe('$uibModal', function () {
           value: function() {
             return deferred.promise;
           }
-        }));
+        }), true);
         expect($document).toHaveModalsOpen(0);
 
         deferred.reject('error in test');
@@ -659,15 +1024,13 @@ describe('$uibModal', function () {
 
       it('should support injection with minification-safe syntax in resolve functions', function() {
         open(modalDefinition('<div>{{value.id}}</div>', {
-          value: ['$locale', function (e) {
+          value: ['$locale', function(e) {
             return e;
           }]
         }));
 
         expect($document).toHaveModalOpenWithContent('en-us', 'div');
       });
-
-      //TODO: resolves with dependency injection - do we want to support them?
     });
 
     describe('scope', function() {
@@ -709,7 +1072,6 @@ describe('$uibModal', function () {
     });
 
     describe('backdrop', function() {
-
       it('should not have any backdrop element if backdrop set to false', function() {
         var modal = open({
           template: '<div>No backdrop</div>',
@@ -737,14 +1099,12 @@ describe('$uibModal', function () {
 
       it('should contain backdrop in classes on each modal opening', function() {
         var modal = open({ template: '<div>With backdrop</div>' });
-        $animate.flush();
         var backdropEl = $document.find('body > div.modal-backdrop');
         expect(backdropEl).toHaveClass('in');
 
         dismiss(modal);
 
         modal = open({ template: '<div>With backdrop</div>' });
-        $animate.flush();
         backdropEl = $document.find('body > div.modal-backdrop');
         expect(backdropEl).toHaveClass('in');
 
@@ -834,6 +1194,62 @@ describe('$uibModal', function () {
       });
     });
 
+    describe('appendTo', function() {
+      it('should be added to body by default', function() {
+        var modal = open({template: '<div>Content</div>'});
+
+        expect($document).toHaveModalsOpen(1);
+        expect($document).toHaveModalOpenWithContent('Content', 'div');
+      });
+
+      it('should not be added to body if appendTo is passed', function() {
+        var element = angular.element('<section>Some content</section>');
+        angular.element(document.body).append(element);
+
+        var modal = open({template: '<div>Content</div>', appendTo: element});
+
+        expect($document).not.toHaveModalOpenWithContent('Content', 'div');
+
+        element.remove();
+      });
+
+      it('should be added to appendTo element if appendTo is passed', function() {
+        var element = angular.element('<section>Some content</section>');
+        angular.element(document.body).append(element);
+
+        expect($document.find('section').children('div.modal').length).toBe(0);
+        open({template: '<div>Content</div>', appendTo: element});
+        expect($document.find('section').children('div.modal').length).toBe(1);
+
+        element.remove();
+      });
+
+      it('should throw error if appendTo element is not found', function() {
+        expect(function(){
+          open({template: '<div>Content</div>', appendTo: $document.find('aside')});
+        }).toThrow(new Error('appendTo element not found. Make sure that the element passed is in DOM.'));
+      });
+
+      it('should be removed from appendTo element when dismissed', function() {
+        var modal = open({template: '<div>Content</div>'});
+
+        expect($document).toHaveModalsOpen(1);
+
+        dismiss(modal);
+        expect($document).toHaveModalsOpen(0);
+      });
+
+      it('should allow requiring parent directive from appendTo target', function() {
+        var element = $compile('<section parent-directive>Some content</section>')($rootScope);
+        angular.element(document.body).append(element);
+
+        open({template: '<div child-directive>{{text}}</div>', appendTo: element});
+        expect($document.find('[child-directive]').text()).toBe('foo');
+
+        element.remove();
+      });
+    });
+
     describe('openedClass', function() {
       var body;
 
@@ -917,11 +1333,59 @@ describe('$uibModal', function () {
         expect(body).not.toHaveClass('bar');
         expect(body).not.toHaveClass('modal-open');
       });
+
+      it('should not add the modal-open class if modal is closed before animation', function() {
+        var modal = open({
+          template: '<div>dummy modal</div>'
+        }, true);
+
+        close(modal);
+
+        expect(body).not.toHaveClass('modal-open');
+      });
     });
   });
 
+  describe('modal window', function() {
+    it('should not use transclusion scope for modals content - issue 2110', function() {
+      $rootScope.animate = false;
+      $compile('<div uib-modal-window animate="animate"><span ng-init="foo=true"></span></div>')($rootScope);
+      $rootScope.$digest();
+
+      expect($rootScope.foo).toBeTruthy();
+    });
+
+    it('should support custom CSS classes as string', function() {
+      $rootScope.animate = false;
+      var windowEl = $compile('<div uib-modal-window animate="animate" window-class="test foo">content</div>')($rootScope);
+      $rootScope.$digest();
+
+      expect(windowEl).toHaveClass('test');
+      expect(windowEl).toHaveClass('foo');
+    });
+
+    it('should support window top class', function () {
+      $rootScope.animate = false;
+      var windowEl = $compile('<div uib-modal-window animate="animate" window-top-class="test foo">content</div>')($rootScope);
+      $rootScope.$digest();
+
+      expect(windowEl).toHaveClass('test');
+      expect(windowEl).toHaveClass('foo');
+    });
+
+    it('should support custom template url', inject(function($templateCache) {
+      $templateCache.put('window.html', '<div class="mywindow" ng-transclude></div>');
+
+      var windowEl = $compile('<div uib-modal-window template-url="window.html" window-class="test">content</div>')($rootScope);
+      $rootScope.$digest();
+
+      expect(windowEl).toHaveClass('mywindow');
+      expect(windowEl).toHaveClass('test');
+    }));
+  });
+
   describe('multiple modals', function() {
-    it('it should allow opening of multiple modals', function() {
+    it('should allow opening of multiple modals', function() {
       var modal1 = open({template: '<div>Modal1</div>'});
       var modal2 = open({template: '<div>Modal2</div>'});
       expect($document).toHaveModalsOpen(2);
@@ -931,6 +1395,17 @@ describe('$uibModal', function () {
       expect($document).toHaveModalOpenWithContent('Modal1', 'div');
 
       dismiss(modal1);
+      expect($document).toHaveModalsOpen(0);
+    });
+
+    it('should be able to dismiss all modals at once', function() {
+      var modal1 = open({template: '<div>Modal1</div>'});
+      var modal2 = open({template: '<div>Modal2</div>'});
+      expect($document).toHaveModalsOpen(2);
+
+      $uibModalStack.dismissAll();
+      $animate.flush();
+      $animate.flush();
       expect($document).toHaveModalsOpen(0);
     });
 
@@ -954,7 +1429,7 @@ describe('$uibModal', function () {
       expect($document).toHaveModalsOpen(2);
     });
 
-    it('multiple modals should not interfere with default options', function() {
+    it('should not interfere with default options', function() {
       var modal1 = open({template: '<div>Modal1</div>', backdrop: false});
       var modal2 = open({template: '<div>Modal2</div>'});
       $rootScope.$digest();
@@ -987,14 +1462,12 @@ describe('$uibModal', function () {
       expect(document.activeElement.tagName).toBe('A');
 
       var modal1 = open({template: '<div>Modal1<button id="focus">inside modal1</button></div>'});
-      $animate.flush();
       $rootScope.$digest();
       document.getElementById('focus').focus();
       expect(document.activeElement.tagName).toBe('BUTTON');
       expect($document).toHaveModalsOpen(1);
 
       var modal2 = open({template: '<div>Modal2</div>'});
-      $animate.flush();
       $rootScope.$digest();
       expect(document.activeElement.tagName).toBe('DIV');
       expect($document).toHaveModalsOpen(2);
@@ -1028,7 +1501,7 @@ describe('$uibModal', function () {
           } else {
             expected += i;
           }
-          ds[x] = {index:i, deferred:$q.defer(), reject:reject};
+          ds[x] = {index: i, deferred: $q.defer(), reject: reject};
 
           var scope = $rootScope.$new();
           scope.index = i;
@@ -1038,7 +1511,7 @@ describe('$uibModal', function () {
             resolve: {
               x: function() { return ds[x].deferred.promise; }
             }
-          }).opened.then(function() {
+          }, true).opened.then(function() {
             expect($uibModalStack.getTop().value.modalScope.index).toEqual(i);
             actual += i;
           });
@@ -1046,9 +1519,9 @@ describe('$uibModal', function () {
 
         angular.forEach(ds, function(d, i) {
           if (d.reject) {
-            d.deferred.reject('rejected:' + d.index );
+            d.deferred.reject('rejected:' + d.index);
           } else {
-            d.deferred.resolve('resolved:' + d.index );
+            d.deferred.resolve('resolved:' + d.index);
           }
           $rootScope.$digest();
         });
@@ -1082,13 +1555,39 @@ describe('$uibModal', function () {
         _permute(0);
       }
 
-      permute(2, function(a) { test(a); });
-      permute(2, function(a) { test(a.map(function(x, i) { return {reject:x}; })); });
-      permute(2, function(a) { test(a.map(function(x, i) { return i === 0 ? {reject:x} : x; })); });
-      permute(3, function(a) { test(a); });
-      permute(3, function(a) { test(a.map(function(x, i) { return {reject:x}; })); });
-      permute(3, function(a) { test(a.map(function(x, i) { return i === 0 ? {reject:x} : x; })); });
-      permute(3, function(a) { test(a.map(function(x, i) { return i === 1 ? {reject:x} : x; })); });
+      permute(2, function(a) {
+        test(a);
+      });
+      permute(2, function(a) {
+        test(a.map(function(x, i) {
+          return {reject:x};
+        }));
+      });
+      permute(2, function(a) {
+        test(a.map(function(x, i) {
+          return i === 0 ? {reject: x} : x;
+        }));
+      });
+      permute(3, function(a) {
+        test(a);
+      });
+      permute(3, function(a) {
+        test(a.map(function(x, i) {
+          return {reject: x};
+        }));
+      });
+      permute(3, function(a) {
+        test(a.map(function(x, i) {
+          return i === 0 ? {reject: x} : x;
+        }));
+      });
+      permute(3, function(a) {
+        test(a.map(function(x, i) {
+          return i === 1 ? {reject: x} : x;
+        }));
+      });
+
+      $animate.flush();
     });
 
     it('should have top class only on top window', function () {
@@ -1157,6 +1656,7 @@ describe('$uibModal', function () {
       var called;
 
       called = false;
+
       close(open({
         template: '<div>content</div>',
         controller: function($scope) {
@@ -1183,73 +1683,4 @@ describe('$uibModal', function () {
       expect(called).toBeTruthy();
     });
   });
-});
-
-/* deprecation tests below */
-
-describe('$modal deprecation', function() {
-  beforeEach(module('ngAnimateMock'));
-  beforeEach(module('ui.bootstrap.modal'));
-  beforeEach(module('template/modal/backdrop.html'));
-  beforeEach(module('template/modal/window.html'));
-
-  it('should suppress warning', function() {
-    module(function($provide) {
-      $provide.value('$modalSuppressWarning', true);
-    });
-
-    inject(function($modal, $timeout, $log, $rootScope) {
-      spyOn($log, 'warn');
-
-      $modal.open({template: '<div>Foo</div>', controller: function($modalInstance) {}});
-      $rootScope.$digest();
-      $timeout.flush(0);
-      expect($log.warn.calls.count()).toBe(0);
-    });
-  });
-
-  it('should give warning by default', inject(function($log) {
-    spyOn($log, 'warn');
-
-    inject(function($compile, $templateCache, $rootScope, $modal, $timeout) {
-      var backdropTemplate =
-        '<div class="modal-backdrop"' +
-        'modal-animation-class="fade"' +
-        'modal-in-class="in"' +
-        'ng-style="{\'z-index\': 1040 + (index && 1 || 0) + index*10}"' +
-        '></div>';
-      $templateCache.put('template/modal/backdrop.html', backdropTemplate);
-
-      var windowTemplate =
-        '<div modal-render="{{$isRendered}}" tabindex="-1" role="dialog" class="modal"' +
-        'modal-animation-class="fade"' +
-        'modal-in-class="in"' +
-        'ng-style="{\'z-index\': 1050 + index*10, display: \'block\'}">' +
-        '<div class="modal-dialog" ng-class="size ? \'modal-\' + size : \'\'"><div class="modal-content" modal-transclude></div></div>' +
-        '</div>';
-      $templateCache.put('template/modal/window.html', windowTemplate);
-
-      $modal.open({template: '<div>Foo</div>', controller: function($modalInstance) {}});
-      $rootScope.$digest();
-      $timeout.flush(0);
-
-      expect($log.warn.calls.count()).toBe(6);
-      expect($log.warn.calls.argsFor(0)).toEqual(['$modal is now deprecated. Use $uibModal instead.']);
-      expect($log.warn.calls.argsFor(1)).toEqual(['$modalInstance is now deprecated. Use $uibModalInstance instead.']);
-      expect($log.warn.calls.argsFor(2)).toEqual(['$modalStack is now deprecated. Use $uibModalStack instead.']);
-      expect($log.warn.calls.argsFor(3)).toEqual(['modal-animation-class is now deprecated. Use uib-modal-animation-class instead.']);
-      expect($log.warn.calls.argsFor(4)).toEqual(['modal-animation-class is now deprecated. Use uib-modal-animation-class instead.']);
-      expect($log.warn.calls.argsFor(5)).toEqual(['modal-transclude is now deprecated. Use uib-modal-transclude instead.']);
-
-      $log.warn.calls.reset();
-      $compile('<div modal-backdrop></div>')($rootScope);
-      $rootScope.$digest();
-      expect($log.warn.calls.argsFor(1)).toEqual(['modal-backdrop is now deprecated. Use uib-modal-backdrop instead.']);
-
-      $log.warn.calls.reset();
-      $compile('<div modal-window></div>')($rootScope);
-      $rootScope.$digest();
-      expect($log.warn.calls.argsFor(2)).toEqual(['modal-window is now deprecated. Use uib-modal-window instead.']);
-    });
-  }));
 });

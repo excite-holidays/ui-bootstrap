@@ -1,7 +1,7 @@
 describe('rating directive', function() {
   var $rootScope, $compile, element;
   beforeEach(module('ui.bootstrap.rating'));
-  beforeEach(module('template/rating/rating.html'));
+  beforeEach(module('uib/template/rating/rating.html'));
   beforeEach(inject(function(_$compile_, _$rootScope_) {
     $compile = _$compile_;
     $rootScope = _$rootScope_;
@@ -22,7 +22,8 @@ describe('rating directive', function() {
     var stars = getStars();
     var state = [];
     for (var i = 0, n = stars.length; i < n; i++) {
-      state.push((stars.eq(i).hasClass(classOn || 'glyphicon-star') && ! stars.eq(i).hasClass(classOff || 'glyphicon-star-empty')));
+      state.push(stars.eq(i).hasClass(classOn || 'glyphicon-star') &&
+        !stars.eq(i).hasClass(classOff || 'glyphicon-star-empty'));
     }
     return state;
   }
@@ -33,7 +34,7 @@ describe('rating directive', function() {
       return angular.element(star).attr('title');
     });
   }
-  
+
   function triggerKeyDown(keyCode) {
     var e = $.Event('keydown');
     e.which = keyCode;
@@ -106,6 +107,7 @@ describe('rating directive', function() {
 
     expect(getState()).toEqual([true, true, false, false, false]);
     expect(element.attr('aria-valuenow')).toBe('2');
+    expect(element.attr('aria-valuetext')).toBe('two');
   });
 
   it('shows different number of icons when `max` attribute is set', function() {
@@ -124,9 +126,9 @@ describe('rating directive', function() {
     expect(element.attr('aria-valuemax')).toBe('15');
   });
 
-  it('handles readonly attribute', function() {
+  it('handles read-only attribute', function() {
     $rootScope.isReadonly = true;
-    element = $compile('<uib-rating ng-model="rate" readonly="isReadonly"></uib-rating>')($rootScope);
+    element = $compile('<uib-rating ng-model="rate" read-only="isReadonly"></uib-rating>')($rootScope);
     $rootScope.$digest();
 
     expect(getState()).toEqual([true, true, true, false, false]);
@@ -142,6 +144,31 @@ describe('rating directive', function() {
     star5.trigger('mouseover');
     $rootScope.$digest();
     expect(getState()).toEqual([true, true, true, true, true]);
+  });
+
+  it('handles enable-reset attribute', function() {
+    $rootScope.canReset = false;
+    element = $compile('<uib-rating ng-model="rate" enable-reset="canReset"></uib-rating>')($rootScope);
+    $rootScope.$digest();
+
+    var star = {
+      states: [true, true, true, true, true],
+      rating: 5
+    };
+
+    var selectStar = getStar(star.rating);
+
+    selectStar.click();
+    $rootScope.$digest();
+    expect(getState()).toEqual(star.states);
+    expect($rootScope.rate).toBe(5);
+    expect(element.attr('aria-valuenow')).toBe('5');
+
+    selectStar.click();
+    $rootScope.$digest();
+    expect(getState()).toEqual(star.states);
+    expect($rootScope.rate).toBe(5);
+    expect(element.attr('aria-valuenow')).toBe('5');
   });
 
   it('should fire onHover', function() {
@@ -280,13 +307,13 @@ describe('rating directive', function() {
       expect(getState('on', 'off')).toEqual([true, true, true, true, true, false, false, false, false, false]);
     });
   });
-  
+
   describe('Default title', function() {
     it('should return the default title for each star', function() {
       expect(getTitles()).toEqual(['one', 'two', 'three', 'four', 'five']);
     });
   });
-  
+
   describe('shows different title when `max` attribute is greater than the titles array ', function() {
     var originalConfig = {};
     beforeEach(inject(function(uibRatingConfig) {
@@ -300,12 +327,12 @@ describe('rating directive', function() {
       // return it to the original state
       angular.extend(uibRatingConfig, originalConfig);
     }));
- 
+
    it('should return the default title for each star', function() {
       expect(getTitles()).toEqual(['one', 'two', 'three', 'four', 'five', '6', '7', '8', '9', '10']);
     });
   });
-  
+
   describe('shows custom titles ', function() {
     it('should return the custom title for each star', function() {
       $rootScope.titles = [44,45,46];
@@ -325,37 +352,4 @@ describe('rating directive', function() {
       expect(getTitles()).toEqual(['one', 'two', 'three', 'four', 'five']);
     });
   });
-});
-
-/* Deprecation tests below */
-
-describe('rating deprecation', function() {
-  beforeEach(module('ui.bootstrap.rating'));
-  beforeEach(module('template/rating/rating.html'));
-
-  it('should suppress warning', function() {
-    module(function($provide) {
-      $provide.value('$ratingSuppressWarning', true);
-    });
-
-    inject(function($compile, $log, $rootScope) {
-      spyOn($log, 'warn');
-
-      var element = $compile('<rating ng-model="rate"></rating>')($rootScope);
-      $rootScope.$digest();
-
-      expect($log.warn.calls.count()).toBe(0);
-    });
-  });
-
-  it('should give warning by default', inject(function($compile, $log, $rootScope) {
-    spyOn($log, 'warn');
-
-    var element = $compile('<rating ng-model="rate"></rating>')($rootScope);
-    $rootScope.$digest();
-
-    expect($log.warn.calls.count()).toBe(2);
-    expect($log.warn.calls.argsFor(0)).toEqual(['RatingController is now deprecated. Use UibRatingController instead.']);
-    expect($log.warn.calls.argsFor(1)).toEqual(['rating is now deprecated. Use uib-rating instead.']);
-  }));
 });

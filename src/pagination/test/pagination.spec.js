@@ -1,7 +1,7 @@
 describe('pagination directive', function() {
   var $compile, $rootScope, $document, $templateCache, body, element;
   beforeEach(module('ui.bootstrap.pagination'));
-  beforeEach(module('template/pagination/pagination.html'));
+  beforeEach(module('uib/template/pagination/pagination.html'));
   beforeEach(inject(function(_$compile_, _$rootScope_, _$document_, _$templateCache_) {
     $compile = _$compile_;
     $rootScope = _$rootScope_;
@@ -21,6 +21,15 @@ describe('pagination directive', function() {
 
   function getPaginationEl(index) {
     return element.find('li').eq(index);
+  }
+
+  // Returns a comma-separated string that represents the pager, like: "Prev, 1, 2, 3, Next"
+  function getPaginationAsText() {
+    var len = getPaginationBarSize(), outItems = [];
+    for (var i = 0; i < len; i++) {
+      outItems.push(getPaginationEl(i).text());
+    }
+    return outItems.join(', ');
   }
 
   function clickPaginationEl(index) {
@@ -46,7 +55,7 @@ describe('pagination directive', function() {
   });
 
   it('exposes the controller to the template', function() {
-    $templateCache.put('template/pagination/pagination.html', '<div>{{pagination.randomText}}</div>');
+    $templateCache.put('uib/template/pagination/pagination.html', '<div>{{pagination.randomText}}</div>');
     var scope = $rootScope.$new();
 
     element = $compile('<uib-pagination></uib-pagination>')(scope);
@@ -244,7 +253,7 @@ describe('pagination directive', function() {
     });
   });
 
-  describe('executes  `ng-change` expression', function() {
+  describe('executes `ng-change` expression', function() {
     beforeEach(function() {
       $rootScope.selectPageHandler = jasmine.createSpy('selectPageHandler');
       element = $compile('<uib-pagination total-items="total" ng-model="currentPage" ng-change="selectPageHandler()"></uib-pagination>')($rootScope);
@@ -350,6 +359,160 @@ describe('pagination directive', function() {
       expect(linkEl).not.toHaveFocus();
 
       element.remove();
+    });
+  });
+
+  describe('with `force-ellipses` option', function() {
+    beforeEach(function() {
+      $rootScope.total = 98; // 10 pages
+      $rootScope.currentPage = 3;
+      $rootScope.maxSize = 5;
+      element = $compile('<uib-pagination total-items="total" ng-model="currentPage" max-size="maxSize" force-ellipses="true"></uib-pagination>')($rootScope);
+      $rootScope.$digest();
+    });
+
+    it('contains maxsize + 3 li elements', function() {
+      expect(getPaginationBarSize()).toBe($rootScope.maxSize + 3);
+      expect(getPaginationEl(0).text()).toBe('Previous');
+      expect(getPaginationEl(-1).text()).toBe('Next');
+      expect(getPaginationEl(-2).text()).toBe('...');
+    });
+
+    it('shows the page number in middle after the next link is clicked', function() {
+      updateCurrentPage(6);
+      clickPaginationEl(-1);
+
+      expect($rootScope.currentPage).toBe(7);
+      expect(getPaginationEl(4)).toHaveClass('active');
+      expect(getPaginationEl(4).text()).toBe(''+$rootScope.currentPage);
+    });
+
+    it('shows the page number in middle after the prev link is clicked', function() {
+      updateCurrentPage(7);
+      clickPaginationEl(0);
+
+      expect($rootScope.currentPage).toBe(6);
+      expect(getPaginationEl(4)).toHaveClass('active');
+      expect(getPaginationEl(4).text()).toBe(''+$rootScope.currentPage);
+    });
+
+    it('changes pagination bar size when max-size value changed', function() {
+      $rootScope.maxSize = 7;
+      $rootScope.$digest();
+      expect(getPaginationBarSize()).toBe(10);
+    });
+
+    it('should display an ellipsis on the right if the last displayed page\'s number is less than the last page', function() {
+      updateCurrentPage(1);
+      expect(getPaginationAsText()).toBe('Previous, 1, 2, 3, 4, 5, ..., Next');
+    });
+
+    it('should display an ellipsis on the left if the first displayed page\'s number is greater than 1', function() {
+      updateCurrentPage(10);
+      expect(getPaginationAsText()).toBe('Previous, ..., 6, 7, 8, 9, 10, Next');
+    });
+
+    it('should display both ellipsis\' if the displayed range is in the middle', function() {
+      updateCurrentPage(5);
+      expect(getPaginationAsText()).toBe('Previous, ..., 3, 4, 5, 6, 7, ..., Next');
+    });
+
+    it('should not display any ellipses if the number of pages >= maxsize', function() {
+      $rootScope.maxSize = 10;
+      $rootScope.$digest();
+      expect(getPaginationAsText()).toBe('Previous, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, Next');
+    });
+  });
+
+  describe('with `boundary-link-numbers` option', function() {
+    beforeEach(function() {
+      $rootScope.total = 98; // 10 pages
+      $rootScope.currentPage = 3;
+      $rootScope.maxSize = 5;
+      element = $compile('<uib-pagination total-items="total" ng-model="currentPage" max-size="maxSize" boundary-link-numbers="true"></uib-pagination>')($rootScope);
+      $rootScope.$digest();
+    });
+
+    it('contains maxsize + 4 li elements', function() {
+      expect(getPaginationBarSize()).toBe($rootScope.maxSize + 4);
+      expect(getPaginationEl(0).text()).toBe('Previous');
+      expect(getPaginationEl(-1).text()).toBe('Next');
+      expect(getPaginationEl(-2).text()).toBe('10');
+      expect(getPaginationEl(-3).text()).toBe('...');
+    });
+
+    it('shows the page number in middle after the next link is clicked', function() {
+      updateCurrentPage(6);
+      clickPaginationEl(-1);
+
+      expect($rootScope.currentPage).toBe(7);
+      expect(getPaginationEl(5)).toHaveClass('active');
+      expect(getPaginationEl(5).text()).toBe(''+$rootScope.currentPage);
+    });
+
+    it('shows the page number in middle after the prev link is clicked', function() {
+      updateCurrentPage(7);
+      clickPaginationEl(0);
+
+      expect($rootScope.currentPage).toBe(6);
+      expect(getPaginationEl(5)).toHaveClass('active');
+      expect(getPaginationEl(5).text()).toBe(''+$rootScope.currentPage);
+    });
+
+    it('changes pagination bar size when max-size value changed', function() {
+      $rootScope.maxSize = 7;
+      $rootScope.$digest();
+      expect(getPaginationBarSize()).toBe(11);
+    });
+
+    it('should display an ellipsis on the right if the last displayed page\'s number is less than the last page', function() {
+      updateCurrentPage(1);
+      expect(getPaginationAsText()).toBe('Previous, 1, 2, 3, 4, 5, ..., 10, Next');
+    });
+
+    it('should display an ellipsis on the left if the first displayed page\'s number is greater than 1', function() {
+      updateCurrentPage(10);
+      expect(getPaginationAsText()).toBe('Previous, 1, ..., 6, 7, 8, 9, 10, Next');
+    });
+
+    it('should display both ellipses if the displayed range is in the middle', function() {
+      $rootScope.maxSize = 3;
+      $rootScope.$digest();
+      updateCurrentPage(6);
+      expect(getPaginationAsText()).toBe('Previous, 1, ..., 5, 6, 7, ..., 10, Next');
+    });
+
+    it('should not display any ellipses if the number of pages >= maxsize', function() {
+      $rootScope.maxSize = 10;
+      $rootScope.$digest();
+      expect(getPaginationAsText()).toBe('Previous, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, Next');
+    });
+
+    it('should not display an ellipsis on the left if the start page is 2', function() {
+      updateCurrentPage(4);
+      expect(getPaginationAsText()).toBe('Previous, 1, 2, 3, 4, 5, 6, ..., 10, Next');
+    });
+
+    it('should not display an ellipsis on the left if the start page is 3', function() {
+      updateCurrentPage(5);
+      expect(getPaginationAsText()).toBe('Previous, 1, 2, 3, 4, 5, 6, 7, ..., 10, Next');
+    });
+
+    it('should not display an ellipsis on the right if the end page is totalPages - 1', function() {
+      updateCurrentPage(7);
+      expect(getPaginationAsText()).toBe('Previous, 1, ..., 5, 6, 7, 8, 9, 10, Next');
+    });
+
+    it('should not display an ellipsis on the right if the end page is totalPages - 2', function() {
+      updateCurrentPage(6);
+      expect(getPaginationAsText()).toBe('Previous, 1, ..., 4, 5, 6, 7, 8, 9, 10, Next');
+    });
+
+    it('should not display any ellipses if the number of pages <= maxsize + 4 and current page is in center', function() {
+      $rootScope.total = 88; // 9 pages
+      $rootScope.$digest();
+      updateCurrentPage(5);
+      expect(getPaginationAsText()).toBe('Previous, 1, 2, 3, 4, 5, 6, 7, 8, 9, Next');
     });
   });
 
@@ -618,7 +781,7 @@ describe('pagination directive', function() {
     });
   });
 
-  describe('`num-pages`', function () {
+  describe('`num-pages`', function() {
     beforeEach(function() {
       $rootScope.numpg = null;
       element = $compile('<uib-pagination total-items="total" ng-model="currentPage" num-pages="numpg"></uib-pagination>')($rootScope);
@@ -688,11 +851,35 @@ describe('pagination directive', function() {
 
       expect(getPaginationBarSize()).toBe(4);
     });
+
+    it('should take forceEllipses defaults into account', function () {
+      paginationConfig.forceEllipses = true;
+      element = $compile('<uib-pagination total-items="total" ng-model="currentPage" max-size="2"></uib-pagination>')($rootScope);
+      $rootScope.$digest();
+
+      // Should contain 2 nav buttons, 2 pages, and 2 ellipsis since the currentPage defaults to 3, which is in the middle
+      expect(getPaginationBarSize()).toBe(6);
+    });
+
+    it('should take boundaryLinkNumbers defaults into account', function () {
+      paginationConfig.boundaryLinkNumbers = true;
+      $rootScope.total = 88; // 9 pages
+      $rootScope.currentPage = 5;
+      element = $compile('<uib-pagination total-items="total" ng-model="currentPage" max-size="3"></uib-pagination>')($rootScope);
+      $rootScope.$digest();
+
+      // Should contain 2 nav buttons, 2 pages, 2 ellipsis, and 2 extra end numbers since the currentPage is in the middle
+      expect(getPaginationBarSize()).toBe(9);
+      expect(getPaginationAsText()).toBe('Previous, 1, ..., 4, 5, 6, ..., 9, Next');
+    });
   });
 
   describe('override configuration from attributes', function() {
     beforeEach(function() {
-      element = $compile('<uib-pagination boundary-links="true" first-text="<<" previous-text="<" next-text=">" last-text=">>" total-items="total" ng-model="currentPage"></uib-pagination>')($rootScope);
+      $rootScope.pageLabel = function(id) {
+          return 'test_'+ id;
+      };
+      element = $compile('<uib-pagination boundary-links="true" page-label="pageLabel($page)" first-text="<<" previous-text="<" next-text=">" last-text=">>" total-items="total" ng-model="currentPage"></uib-pagination>')($rootScope);
       $rootScope.$digest();
     });
 
@@ -705,6 +892,13 @@ describe('pagination directive', function() {
       expect(getPaginationEl(1).text()).toBe('<');
       expect(getPaginationEl(-2).text()).toBe('>');
       expect(getPaginationEl(-1).text()).toBe('>>');
+    });
+
+    it('has the label of the page as text in each page item', function() {
+      for (var i = 1; i <= 5; i++) {
+        // +1 because the first element is a <
+        expect(getPaginationEl(i+1).text()).toEqual('test_'+i);
+      }
     });
   });
 
@@ -735,32 +929,26 @@ describe('pagination directive', function() {
   });
 });
 
-describe('pagination deprecation', function() {
+describe('pagination directive', function() {
+  var $compile, $rootScope, element;
   beforeEach(module('ui.bootstrap.pagination'));
-  beforeEach(module('template/pagination/pagination.html'));
+  beforeEach(module('uib/template/pagination/pagination.html'));
+  beforeEach(inject(function(_$compile_, _$rootScope_) {
+    $compile = _$compile_;
+    $rootScope = _$rootScope_;
+  }));
 
-  it('should suppress warning', function() {
-    module(function($provide) {
-      $provide.value('$paginationSuppressWarning', true);
-    });
-
-    inject(function($compile, $log, $rootScope) {
-      spyOn($log, 'warn');
-
-      var element = $compile('<pagination></pagination>')($rootScope);
-      $rootScope.$digest();
-      expect($log.warn.calls.count()).toBe(0);
-    });
-  });
-
-  it('should give warning by default', inject(function($compile, $log, $rootScope) {
-    spyOn($log, 'warn');
-
-    var element = $compile('<pagination></pagination>')($rootScope);
+  it('should retain the model value when total-items starts as undefined', function() {
+    $rootScope.currentPage = 5;
+    $rootScope.total = undefined;
+    element = $compile('<uib-pagination total-items="total" ng-model="currentPage"></uib-pagination>')($rootScope);
     $rootScope.$digest();
 
-    expect($log.warn.calls.count()).toBe(2);
-    expect($log.warn.calls.argsFor(0)).toEqual(['PaginationController is now deprecated. Use UibPaginationController instead.']);
-    expect($log.warn.calls.argsFor(1)).toEqual(['pagination is now deprecated. Use uib-pagination instead.']);
-  }));
+    expect($rootScope.currentPage).toBe(5);
+
+    $rootScope.total = 100;
+    $rootScope.$digest();
+
+    expect($rootScope.currentPage).toBe(5);
+  });
 });

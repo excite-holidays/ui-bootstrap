@@ -2,7 +2,7 @@
 
 Firstly, please go over our FAQ: https://github.com/angular-ui/bootstrap/wiki/FAQ
 
-Please, do not open issues for the general support questions as we want to keep GitHub issues for bug reports and feature requests. You've got much better chances of getting your question answered on [StackOverflow](http://stackoverflow.com/questions/tagged/angular-ui-bootstrap) where maintainers are looking at questions questions tagged with `angular-ui-bootstrap`.
+Please, do not open issues for the general support questions as we want to keep GitHub issues for bug reports and feature requests. You've got much better chances of getting your question answered on [StackOverflow](http://stackoverflow.com/questions/tagged/angular-ui-bootstrap) where maintainers are looking at questions tagged with `angular-ui-bootstrap`.
 
 StackOverflow is a much better place to ask questions since:
 * there are hundreds of people willing to help on StackOverflow
@@ -30,8 +30,6 @@ Unfortunately we are not able to investigate / fix bugs without a minimal reprod
 
 ## You want to contribute some code?
 
-**NOTE: We are migrating all our components to use a prefix, in the meantime you will see both the new and the old directives separated by a comment. If you want to contribute with code, make all your changes on top of that comment.** 
-
 We are always looking for the quality contributions and will be happy to accept your Pull Requests as long as those adhere to some basic rules:
 
 * Please make sure that your contribution fits well in the project's context:
@@ -44,4 +42,4 @@ We are always looking for the quality contributions and will be happy to accept 
 * Please assure that you are submitting quality code, specifically make sure that:
   * your directive has accompanying tests and all the tests are passing; don't hesitate to contact us (angular-ui@googlegroups.com) if you need any help with unit testing
   * your PR doesn't break the build; check the Travis-CI build status after opening a PR and push corrective commits if anything goes wrong
-  * your commits conform to the conventions established [here](https://github.com/ajoslin/conventional-changelog/blob/master/conventions/angular.md)
+  * your commits conform to the conventions established [here](https://github.com/stevemao/conventional-changelog-angular/blob/master/convention.md)

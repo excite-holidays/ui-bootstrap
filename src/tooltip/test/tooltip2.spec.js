@@ -2,9 +2,9 @@ describe('tooltip directive', function() {
   var $rootScope, $compile, $document, $timeout;
 
   beforeEach(module('ui.bootstrap.tooltip'));
-  beforeEach(module('template/tooltip/tooltip-popup.html'));
-  beforeEach(module('template/tooltip/tooltip-template-popup.html'));
-  beforeEach(module('template/tooltip/tooltip-html-popup.html'));
+  beforeEach(module('uib/template/tooltip/tooltip-popup.html'));
+  beforeEach(module('uib/template/tooltip/tooltip-template-popup.html'));
+  beforeEach(module('uib/template/tooltip/tooltip-html-popup.html'));
   beforeEach(inject(function(_$rootScope_, _$compile_, _$document_, _$timeout_) {
     $rootScope = _$rootScope_;
     $compile = _$compile_;
@@ -24,7 +24,7 @@ describe('tooltip directive', function() {
               pass: util.equals(ttipElements.length, noOfOpened, customEqualityTesters)
             };
 
-            if (result.message) {
+            if (result.pass) {
               result.message = 'Expected "' + angular.mock.dump(ttipElements) + '" not to have "' + ttipElements.length + '" opened tooltips.';
             } else {
               result.message = 'Expected "' + angular.mock.dump(ttipElements) + '" to have "' + ttipElements.length + '" opened tooltips.';
@@ -35,6 +35,10 @@ describe('tooltip directive', function() {
         };
       }
     });
+  });
+
+  afterEach(function() {
+    $document.off('keypress');
   });
 
   function compileTooltip(ttipMarkup) {
@@ -52,9 +56,7 @@ describe('tooltip directive', function() {
   }
 
   function trigger(element, evt) {
-    evt = new Event(evt);
-
-    element[0].dispatchEvent(evt);
+    element.trigger(evt);
     element.scope().$$childTail.$digest();
   }
 
@@ -186,97 +188,5 @@ describe('tooltip directive', function() {
     $timeout.flush();
     // One needs to flush deferred functions before checking there is no tooltip.
     expect(fragment).not.toHaveOpenTooltips();
-  });
-});
-
-/* Deprecation tests below */
-
-describe('tooltip deprecation', function() {
-  beforeEach(module('ui.bootstrap.tooltip'));
-  beforeEach(module('template/tooltip/tooltip-popup.html'));
-  beforeEach(module('template/tooltip/tooltip-template-popup.html'));
-  beforeEach(module('template/tooltip/tooltip-html-popup.html'));
-
-  describe('tooltip', function() {
-    it('should suppress warning', function() {
-      module(function($provide) {
-        $provide.value('$tooltipSuppressWarning', true);
-      });
-
-      inject(function($compile, $log, $rootScope) {
-        spyOn($log, 'warn');
-
-        var element = '<div><span tooltip="tooltip text">Trigger here</span></div>';
-        element = $compile(element)($rootScope);
-        $rootScope.$digest();
-        expect($log.warn.calls.count()).toBe(0);
-      });
-    });
-
-    it('should give warning by default', inject(function($compile, $log, $rootScope) {
-      spyOn($log, 'warn');
-
-      var element = '<div><span tooltip="tooltip text">Trigger here</span></div>';
-      element = $compile(element)($rootScope);
-      $rootScope.$digest();
-
-      expect($log.warn.calls.count()).toBe(1);
-      expect($log.warn.calls.argsFor(0)).toEqual(['$tooltip is now deprecated. Use $uibTooltip instead.']);
-    }));
-  });
-
-  describe('tooltip html', function() {
-    var elm, elmBody, elmScope, tooltipScope;
-
-    function trigger(element, evt) {
-      evt = new Event(evt);
-
-      element[0].dispatchEvent(evt);
-      element.scope().$$childTail.$digest();
-    }
-
-    it('should suppress warning', function() {
-      module(function($provide) {
-        $provide.value('$tooltipSuppressWarning', true);
-      });
-
-      inject(function($compile, $log, $rootScope, $sce) {
-        spyOn($log, 'warn');
-
-        $rootScope.html = 'I say: <strong class="hello">Hello!</strong>';
-        $rootScope.safeHtml = $sce.trustAsHtml($rootScope.html);
-        elmBody = angular.element('<div><span tooltip-html="safeHtml">Selector Text</span></div>');
-        $compile(elmBody)($rootScope);
-        $rootScope.$digest();
-        elm = elmBody.find('span');
-        elmScope = elm.scope();
-        tooltipScope = elmScope.$$childTail;
-
-        trigger(elm, 'mouseenter');
-        tooltipScope.$digest();
-
-        expect($log.warn.calls.count()).toBe(0);
-      });
-    });
-
-    it('should give warning by default', inject(function($compile, $log, $rootScope, $sce) {
-      spyOn($log, 'warn');
-
-      $rootScope.html = 'I say: <strong class="hello">Hello!</strong>';
-      $rootScope.safeHtml = $sce.trustAsHtml($rootScope.html);
-      elmBody = angular.element('<div><span tooltip-html="safeHtml">Selector Text</span></div>');
-      $compile(elmBody)($rootScope);
-      $rootScope.$digest();
-      elm = elmBody.find('span');
-      elmScope = elm.scope();
-      tooltipScope = elmScope.$$childTail;
-
-      trigger(elm, 'mouseenter');
-      tooltipScope.$digest();
-
-      expect($log.warn.calls.count()).toBe(2);
-      expect($log.warn.calls.argsFor(0)).toEqual(['$tooltip is now deprecated. Use $uibTooltip instead.']);
-      expect($log.warn.calls.argsFor(1)).toEqual(['tooltip-html-popup is now deprecated. Use uib-tooltip-html-popup instead.']);
-    }));
   });
 });
