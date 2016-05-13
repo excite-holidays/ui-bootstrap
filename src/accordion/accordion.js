@@ -66,7 +66,8 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
       heading: '@',               // Interpolate the heading attribute onto this scope
       panelClass: '@?',           // Ditto with panelClass
       isOpen: '=?',
-      isDisabled: '=?'
+      isDisabled: '=?',
+      onTransitioned: '&?'
     },
     controller: function() {
       this.setHeading = function(element) {
@@ -90,6 +91,12 @@ angular.module('ui.bootstrap.accordion', ['ui.bootstrap.collapse'])
           if (!$event || $event.which === 32) {
             scope.isOpen = !scope.isOpen;
           }
+        }
+      };
+
+      scope.transitioned = function() {
+        if (scope.onTransitioned) {
+          scope.onTransitioned();
         }
       };
 
