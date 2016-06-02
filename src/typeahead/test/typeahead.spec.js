@@ -222,8 +222,6 @@ describe('typeahead tests', function() {
         expect(element).toBeClosed();
     });
 
-
-
     it('should support custom model selecting function', function() {
       $scope.updaterFn = function(selectedItem) {
         return 'prefix' + selectedItem;
@@ -313,6 +311,21 @@ describe('typeahead tests', function() {
 
       expect($scope.form.input.$error.editable).toBeFalsy();
       expect($scope.form.input.$error.parse).toBeFalsy();
+    });
+
+    it('should go through other validators after blur for typeahead-editable="false"', function () {
+        var element = prepareInputEl(
+        '<div><form name="form">' +
+          '<input name="input" ng-model="result" uib-typeahead="item for item in source | filter:$viewValue" typeahead-editable="false" required>' +
+        '</form></div>');
+        var inputEl = findInput(element);
+
+        changeInputValueTo(element, 'not in matches');
+        expect($scope.result).toEqual(undefined);
+        expect(inputEl.val()).toEqual('not in matches');
+        inputEl.blur(); // input loses focus
+        expect($scope.result).toEqual(undefined);
+        expect($scope.form.input.$error.required).toBeTruthy();
     });
 
     it('should clear view value when no value selected for typeahead-editable="false" typeahead-select-on-blur="false"', function () {
@@ -454,6 +467,57 @@ describe('typeahead tests', function() {
         prepareInputEl('<div><input ng-model="result" uib-typeahead="an invalid expression"></div>');
       };
       expect(prepareInvalidDir).toThrow();
+    });
+
+    it('should remove the id attribute from the original DOM element', function() {
+      var element = prepareInputEl('<div><input id="typeahead-element" ng-model="result" uib-typeahead="item for item in source | filter:$viewValue" typeahead-show-hint="true"></div>');
+      var inputEl = findInput(element);
+
+      expect(inputEl.size()).toBe(2);
+      expect(inputEl.eq(0).attr('id')).toBe(undefined);
+      expect(inputEl.eq(1).attr('id')).toBe('typeahead-element');
+    });
+  });
+
+  describe('shouldSelect', function() {
+    it('should select a match when function returns true', function() {
+      $scope.shouldSelectFn = function() {
+        return true;
+      };
+      var element = prepareInputEl('<div><input ng-model="result" typeahead-should-select="shouldSelectFn($event)" uib-typeahead="item for item in source | filter:$viewValue"></div>');
+      var inputEl = findInput(element);
+
+      changeInputValueTo(element, 'b');
+      triggerKeyDown(element, 13);
+
+      expect($scope.result).toEqual('bar');
+      expect(inputEl.val()).toEqual('bar');
+      expect(element).toBeClosed();
+    });
+    it('should not select a match when function returns false', function() {
+      $scope.shouldSelectFn = function() {
+        return false;
+      };
+      var element = prepareInputEl('<div><input ng-model="result" typeahead-should-select="shouldSelectFn($event)" uib-typeahead="item for item in source | filter:$viewValue"></div>');
+      var inputEl = findInput(element);
+
+      changeInputValueTo(element, 'b');
+      triggerKeyDown(element, 13);
+
+      // no change
+      expect($scope.result).toEqual('b');
+      expect(inputEl.val()).toEqual('b');
+    });
+    it('should pass key event into select trigger function', function() {
+      $scope.shouldSelectFn = jasmine.createSpy('shouldSelectFn');//.and.returnValue(true);
+      var element = prepareInputEl('<div><input ng-model="result" typeahead-should-select="shouldSelectFn($event)" uib-typeahead="item for item in source | filter:$viewValue"></div>');
+      var inputEl = findInput(element);
+
+      changeInputValueTo(element, 'b');
+      triggerKeyDown(element, 13);
+
+      expect($scope.shouldSelectFn.calls.count()).toEqual(1);
+      expect($scope.shouldSelectFn.calls.argsFor(0)[0].which).toEqual(13);
     });
   });
 
